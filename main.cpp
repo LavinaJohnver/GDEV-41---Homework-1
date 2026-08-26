@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <string>
+#include <random>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -24,6 +25,24 @@ struct grid {
         }
     }
 
+    void spawn_position() {
+        std::random_device rd;
+        std::mt19937 rng(rd());
+        std::uniform_int_distribution<int> dist_row(0, row - 1);
+        std::uniform_int_distribution<int> dist_col(0, col - 1);
+
+        int player_row = dist_row(rng);
+        int player_col = dist_col(rng);
+        grid_array[player_row][player_col] = "P"; // Spawns player
+
+        int enemy_row, enemy_col;
+        do {
+            enemy_row = dist_row(rng);
+            enemy_col = dist_col(rng);
+        } while (enemy_row == player_row && enemy_col == player_col); // Ensure enemy doesn't spawn on player
+        grid_array[enemy_row][enemy_col] = "E"; // Spawns enemy
+    }
+
     void render_grid() {
         std::string border(col * 4 + 1, '-');
 
@@ -38,6 +57,9 @@ struct grid {
         }
         std::cout << border << std::endl;
     }
+
+
+
 
     // Deallocate memory stuff
     ~grid() {
@@ -54,7 +76,8 @@ int main() {
     #endif
 
     grid g;
-    g.construct_grid(10, 20);
+    g.construct_grid(3, 10);
+    g.spawn_position();
     g.render_grid();
 
     // GRID VISUALIZATION FOR LATA
