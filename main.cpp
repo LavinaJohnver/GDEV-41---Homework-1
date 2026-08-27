@@ -38,8 +38,8 @@ struct grid {
         std::uniform_int_distribution<int> dist_row(0, row - 1);
         std::uniform_int_distribution<int> dist_col(0, col - 1);
 
-        player_row = dist_row(rng);   // no "int" — assigns the member
-        player_col = dist_col(rng);   // no "int" — assigns the member
+        player_row = dist_row(rng);
+        player_col = dist_col(rng);
         grid_array[player_row][player_col] = "▲";
 
         do {
@@ -86,7 +86,11 @@ struct grid {
             return false; // would move off da grid
         }
 
-        grid_array[player_row][player_col] = " ";
+        if (player_row == enemy_row && player_col == enemy_col) {
+            grid_array[player_row][player_col] = "■";
+        } else {
+            grid_array[player_row][player_col] = " ";
+        }
         player_row = new_row;
         player_col = new_col;
         grid_array[player_row][player_col] = "▲";
@@ -168,6 +172,14 @@ void load_settings(const std::string& filepath, int& outRow, int& outCol) {
     file.close();
 }
 
+void clear_screen() {
+    #ifdef _WIN32
+        system("cls");
+    #else
+        system("clear");
+    #endif
+}
+
 int main() {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -181,10 +193,15 @@ int main() {
     grid g;
     g.construct_grid(settings_col, settings_row);
     g.spawn_position();
+
+    std::cout   << "========================= TRIANGLES VS SQUARES =========================\n"
+                << "These squares have invaded our territory! We are deploying you to eliminate them!\n\n\n"
+                << "Type \"attack\" or \"a\" to attack the square if you both are in the same cell!\n"
+                << "Move with north/south/east/west (or n/s/e/w). Type \"exit\" to quit.\n";
+
     g.render_grid();
 
     std::string input;
-    std::cout << "Move with north/south/east/west (or n/s/e/w). Type \"exit\" to quit.\n";
     while (std::getline(std::cin, input)) {
         std::string lowered = input;
         for (size_t i = 0; i < lowered.size(); ++i) {
@@ -197,16 +214,20 @@ int main() {
 
         if (lowered == "attack" || lowered == "a") {
             if (g.attack()) {
+                clear_screen();
                 g.render_grid();
-                std::cout << "hell yeah!\n";
+                std::cout << "Triangles triumph!\n";
                 break;
             } else {
-                std::cout << "nobody here bro\n";
+                std::cout << "Nothing happens...\n";
             }
             continue;
         }
 
         if (g.move_player(input)) {
+            clear_screen();
+            std::cout << "Type \"attack\" or \"a\" to attack the square if you both are in the same cell!\n"
+                      << "Move with north/south/east/west (or n/s/e/w). Type \"exit\" to quit.\n";
             g.render_grid();
         }
         // Anything else (including unrecognized input) isn't registered
