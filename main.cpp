@@ -49,7 +49,6 @@ struct grid {
         grid_array[enemy_row][enemy_col] = "E"; // Spawns enemy
     }
 
-    // Moves the player one step in the given direction if inupt is valid
     bool move_player(const std::string& input) {
         std::string dir = input;
         for (size_t i = 0; i < dir.size(); ++i) {
@@ -73,7 +72,7 @@ struct grid {
 
         //checks if within bounds
         if (new_row < 0 || new_row >= row || new_col < 0 || new_col >= col) {
-            return false; // would move off the grid
+            return false; // would move off da grid
         }
 
         grid_array[player_row][player_col] = " ";
@@ -81,6 +80,14 @@ struct grid {
         player_col = new_col;
         grid_array[player_row][player_col] = "P";
         return true;
+    }
+
+    // check if player in same cell
+    bool attack() {
+        if (player_row == enemy_row && player_col == enemy_col) {
+            return true;
+        }
+        return false;
     }
 
     void render_grid() {
@@ -167,10 +174,21 @@ int main() {
             break;
         }
 
+        if (lowered == "attack" || lowered == "a") {
+            if (g.attack()) {
+                g.render_grid();
+                std::cout << "hell yeah!\n";
+                break;
+            } else {
+                std::cout << "nobody here bro\n";
+            }
+            continue;
+        }
+
         if (g.move_player(input)) {
             g.render_grid();
         }
-        // Anything else (including unrecognized input) is simply not registered.
+        // Anything else (including unrecognized input) isn't registered
     }
 
     // GRID VISUALIZATION FOR LATA
