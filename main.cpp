@@ -4,6 +4,7 @@
 #include <cmath>
 #include <string>
 #include <random>
+#include <cctype>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -13,6 +14,10 @@ struct grid {
     int row;
     int col;
     std::string** grid_array;
+    int player_row;
+    int player_col;
+    int enemy_row;
+    int enemy_col;
 
     void construct_grid(int w, int h) {
         this->row = w;
@@ -37,7 +42,6 @@ struct grid {
         int player_col = dist_col(rng);
         grid_array[player_row][player_col] = "▲"; // Spawns player
 
-        int enemy_row, enemy_col;
         do {
             enemy_row = dist_row(rng);
             enemy_col = dist_col(rng);
@@ -54,6 +58,47 @@ struct grid {
             line += (i == col - 1) ? right : middle;
         }
         return line;
+    }
+
+    bool move_player(const std::string& input) {
+        std::string dir = input;
+        for (size_t i = 0; i < dir.size(); ++i) {
+            dir[i] = std::tolower(dir[i]);
+        }
+
+        int new_row = player_row;
+        int new_col = player_col;
+
+        if (dir == "north" || dir == "n") {
+            new_row -= 1;
+        } else if (dir == "south" || dir == "s") {
+            new_row += 1;
+        } else if (dir == "east" || dir == "e") {
+            new_col += 1;
+        } else if (dir == "west" || dir == "w") {
+            new_col -= 1;
+        } else {
+            return false; // input not registered
+        }
+
+        //checks if within bounds
+        if (new_row < 0 || new_row >= row || new_col < 0 || new_col >= col) {
+            return false; // would move off da grid
+        }
+
+        grid_array[player_row][player_col] = " ";
+        player_row = new_row;
+        player_col = new_col;
+        grid_array[player_row][player_col] = "P";
+        return true;
+    }
+
+    // check if player in same cell
+    bool attack() {
+        if (player_row == enemy_row && player_col == enemy_col) {
+            return true;
+        }
+        return false;
     }
 
     void render_grid() {
@@ -137,6 +182,34 @@ int main() {
     g.construct_grid(settings_col, settings_row);
     g.spawn_position();
     g.render_grid();
-    
+
+    std::string input;
+    std::cout << "Move with north/south/east/west (or n/s/e/w). Type \"exit\" to quit.\n";
+    while (std::getline(std::cin, input)) {
+        std::string lowered = input;
+        for (size_t i = 0; i < lowered.size(); ++i) {
+            lowered[i] = std::tolower(lowered[i]);
+        }
+
+        if (lowered == "exit") {
+            break;
+        }
+
+        if (lowered == "attack" || lowered == "a") {
+            if (g.attack()) {
+                g.render_grid();
+                std::cout << "hell yeah!\n";
+                break;
+            } else {
+                std::cout << "nobody here bro\n";
+            }
+            continue;
+        }
+
+        if (g.move_player(input)) {
+            g.render_grid();
+        }
+        // Anything else (including unrecognized input) isn't registered
+    }
     return 0;
 }
