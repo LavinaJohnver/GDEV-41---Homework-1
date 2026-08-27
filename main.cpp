@@ -35,29 +35,50 @@ struct grid {
 
         int player_row = dist_row(rng);
         int player_col = dist_col(rng);
-        grid_array[player_row][player_col] = "P"; // Spawns player
+        grid_array[player_row][player_col] = "▲"; // Spawns player
 
         int enemy_row, enemy_col;
         do {
             enemy_row = dist_row(rng);
             enemy_col = dist_col(rng);
         } while (enemy_row == player_row && enemy_col == player_col); // Ensure enemy doesn't spawn on player
-        grid_array[enemy_row][enemy_col] = "E"; // Spawns enemy
+        grid_array[enemy_row][enemy_col] = "■"; // Spawns enemy
+    }
+
+    // Function to build horizontal lines with specific characters for edges, junctions, and fillers
+    std::string build_line(std::string& left, std::string& middle,
+                            std::string& right, std::string& filler) {
+        std::string line = left;
+        for (int i = 0; i < col; ++i) {
+            line += filler + filler + filler;
+            line += (i == col - 1) ? right : middle;
+        }
+        return line;
     }
 
     void render_grid() {
-        std::string border(col * 4 + 1, '-');
+        std::string top_l = "┌", top_m = "┬", top_r = "┐";
+        std::string mid_l = "├", mid_m = "┼", mid_r = "┤";
+        std::string bot_l = "└", bot_m = "┴", bot_r = "┘";
+        std::string x_fill = "─", y_fill = "│";
+
+        std::string top_line = build_line(top_l, top_m, top_r, x_fill);
+        std::string mid_line = build_line(mid_l, mid_m, mid_r, x_fill);
+        std::string bot_line = build_line(bot_l, bot_m, bot_r, x_fill);
+
+        std::cout << top_line << std::endl;
 
         for (int i = 0; i < row; ++i) {
-            std::cout << border << std::endl;
+            std::cout << y_fill;
 
             for (int j = 0; j < col; ++j) {
                 std::string cell = grid_array[i][j].empty() ? " " : grid_array[i][j]; // If cell is empty, display space
-                std::cout << "| " << cell << " ";
+                std::cout << " " << cell << " " << y_fill;
             }
-            std::cout << "|" << std::endl;
+            std::cout << std::endl;
+
+            std::cout << (i == row - 1 ? bot_line : mid_line) << std::endl;
         }
-        std::cout << border << std::endl;
     }
 
     // Deallocating memory
@@ -70,7 +91,7 @@ struct grid {
 };
 
 void load_settings(const std::string& filepath, int& outRow, int& outCol) {
-    std::ifstream file("settings.txt");
+    std::ifstream file(filepath);
 
     if(!file.is_open()) {
         std::cerr << "Error: Could not open settings.txt!" << std::endl;
@@ -113,20 +134,9 @@ int main() {
     load_settings("settings.txt", settings_row, settings_col);
 
     grid g;
-    g.spawn_position();
     g.construct_grid(settings_col, settings_row);
+    g.spawn_position();
     g.render_grid();
-
-    // GRID VISUALIZATION FOR LATA
-    // What grid should look like maybe, 
-    // arrows are for player, X is for enemy
-    //
-    // std::cout << "┌───┬───┬───┐" << std::endl;
-    // std::cout << "│   │ ▲ │   │" << std::endl;
-    // std::cout << "├───┼───┼───┤" << std::endl;
-    // std::cout << "│ ◄ │ X │ ► │" << std::endl;
-    // std::cout << "├───┼───┼───┤" << std::endl;
-    // std::cout << "│   │ ▼ │   │" << std::endl;
-    // std::cout << "└───┴───┴───┘" << std::endl;
+    
     return 0;
 }
