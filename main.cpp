@@ -38,15 +38,15 @@ struct grid {
         std::uniform_int_distribution<int> dist_row(0, row - 1);
         std::uniform_int_distribution<int> dist_col(0, col - 1);
 
-        int player_row = dist_row(rng);
-        int player_col = dist_col(rng);
-        grid_array[player_row][player_col] = "▲"; // Spawns player
+        player_row = dist_row(rng);   // no "int" — assigns the member
+        player_col = dist_col(rng);   // no "int" — assigns the member
+        grid_array[player_row][player_col] = "▲";
 
         do {
             enemy_row = dist_row(rng);
             enemy_col = dist_col(rng);
-        } while (enemy_row == player_row && enemy_col == player_col); // Ensure enemy doesn't spawn on player
-        grid_array[enemy_row][enemy_col] = "■"; // Spawns enemy
+        } while (enemy_row == player_row && enemy_col == player_col);
+        grid_array[enemy_row][enemy_col] = "■";
     }
 
     // Function to build horizontal lines with specific characters for edges, junctions, and fillers
@@ -89,7 +89,7 @@ struct grid {
         grid_array[player_row][player_col] = " ";
         player_row = new_row;
         player_col = new_col;
-        grid_array[player_row][player_col] = "P";
+        grid_array[player_row][player_col] = "▲";
         return true;
     }
 
