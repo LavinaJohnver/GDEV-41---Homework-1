@@ -18,20 +18,23 @@ struct grid {
     int player_col;
     int enemy_row;
     int enemy_col;
+    std::string player_symbol = "▲";
 
+    // Construct a grid based on provided dimensions
     void construct_grid(int w, int h) {
         this->row = w;
         this->col = h;
 
-        grid_array = new std::string*[row];         // allocate array of row pointers
+        grid_array = new std::string*[row];
         for (int i = 0; i < row; ++i) {
-            grid_array[i] = new std::string[col];   // allocate each row
+            grid_array[i] = new std::string[col];
             for (int j = 0; j < col; ++j) {
-                grid_array[i][j] = " ";             // populate cells with spaces
+                grid_array[i][j] = " ";
             }
         }
     }
 
+    // Randomize initial player and enemy positions
     void spawn_position() {
         std::random_device rd;
         std::mt19937 rng(rd());
@@ -40,13 +43,64 @@ struct grid {
 
         player_row = dist_row(rng);
         player_col = dist_col(rng);
-        grid_array[player_row][player_col] = "▲";
+        grid_array[player_row][player_col] = player_symbol;
 
         do {
             enemy_row = dist_row(rng);
             enemy_col = dist_col(rng);
         } while (enemy_row == player_row && enemy_col == player_col);
         grid_array[enemy_row][enemy_col] = "■";
+    }
+
+    // Move player based on input direction, update grid and player symbol
+    bool move_player(const std::string& input) {
+        std::string dir = input;
+        for (size_t i = 0; i < dir.size(); ++i) {
+            dir[i] = std::tolower(dir[i]);
+        }
+
+        int new_row = player_row;
+        int new_col = player_col;
+        std::string new_symbol = player_symbol;
+
+        if (dir == "north" || dir == "n") {
+            new_row -= 1;
+            new_symbol = "▲";
+        } else if (dir == "south" || dir == "s") {
+            new_row += 1;
+            new_symbol = "▼";
+        } else if (dir == "east" || dir == "e") {
+            new_col += 1;
+            new_symbol = "►";
+        } else if (dir == "west" || dir == "w") {
+            new_col -= 1;
+            new_symbol = "◄";
+        } else {
+            return false; // input not registered
+        }
+
+        if (new_row < 0 || new_row >= row || new_col < 0 || new_col >= col) {
+            return false; // would move off the grid
+        }
+
+        if (player_row == enemy_row && player_col == enemy_col) {
+            grid_array[player_row][player_col] = "■";
+        } else {
+            grid_array[player_row][player_col] = " ";
+        }
+        player_row = new_row;
+        player_col = new_col;
+        player_symbol = new_symbol;
+        grid_array[player_row][player_col] = player_symbol;
+        return true;
+    }
+
+    // Check if player in same cell
+    bool attack() {
+        if (player_row == enemy_row && player_col == enemy_col) {
+            return true;
+        }
+        return false;
     }
 
     // Function to build horizontal lines with specific characters for edges, junctions, and fillers
@@ -60,51 +114,7 @@ struct grid {
         return line;
     }
 
-    bool move_player(const std::string& input) {
-        std::string dir = input;
-        for (size_t i = 0; i < dir.size(); ++i) {
-            dir[i] = std::tolower(dir[i]);
-        }
-
-        int new_row = player_row;
-        int new_col = player_col;
-
-        if (dir == "north" || dir == "n") {
-            new_row -= 1;
-        } else if (dir == "south" || dir == "s") {
-            new_row += 1;
-        } else if (dir == "east" || dir == "e") {
-            new_col += 1;
-        } else if (dir == "west" || dir == "w") {
-            new_col -= 1;
-        } else {
-            return false; // input not registered
-        }
-
-        //checks if within bounds
-        if (new_row < 0 || new_row >= row || new_col < 0 || new_col >= col) {
-            return false; // would move off da grid
-        }
-
-        if (player_row == enemy_row && player_col == enemy_col) {
-            grid_array[player_row][player_col] = "■";
-        } else {
-            grid_array[player_row][player_col] = " ";
-        }
-        player_row = new_row;
-        player_col = new_col;
-        grid_array[player_row][player_col] = "▲";
-        return true;
-    }
-
-    // check if player in same cell
-    bool attack() {
-        if (player_row == enemy_row && player_col == enemy_col) {
-            return true;
-        }
-        return false;
-    }
-
+    // Render the grid with borders and symbols
     void render_grid() {
         std::string top_l = "┌", top_m = "┬", top_r = "┐";
         std::string mid_l = "├", mid_m = "┼", mid_r = "┤";
