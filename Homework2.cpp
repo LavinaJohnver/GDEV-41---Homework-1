@@ -10,6 +10,42 @@ struct Particle
     Color color;
 };
 
+// for generating random floats between min and max
+float GetRandomFloat(float min, float max)
+{
+    float scale = GetRandomValue(0,1000)/1000.0f;
+    return min + scale * (max-min);
+};
+
+// for generating random colors
+Color GetRandomColor()
+{
+    return Color{
+        (unsigned char)GetRandomValue(0,255),
+        (unsigned char)GetRandomValue(0,255),
+        (unsigned char)GetRandomValue(0,255),
+        255
+    };
+}
+
+void EmitParticle(Particle *particles, int particleCount, Vector2 pos, Vector2 dir, float speed, float lifetime, Color color)
+{
+    for(int i = 0; i <particleCount; i++)
+    {
+        if(!particles[i].isActive)
+        {
+            particles[i].isActive = true;
+            particles[i].position = pos;
+            particles[i].direction = dir;
+            particles[i].speed = speed;
+            particles[i].lifeTime = lifetime;
+            particles[i].color = color;
+            break;
+            
+        }
+    }
+}
+
 int main()
 {
     const int screenWidth = 800;
@@ -26,10 +62,72 @@ int main()
         particles[i].isActive = false;
     }
 
+    float rateX = 20.0f; //default emission rate
+    float timeX = 0.0f; //controls emission intervals
+
     while (!WindowShouldClose())
     {
+        float dt = GetFrameTime();
+        
+        // adjusts spawn rate
+        if (IsKeyDown(KEY_LEFT)) rateX -= 20.0f * dt;
+        if (IsKeyDown(KEY_RIGHT)) rateX += 20.0f * dt;
+        
+        // threshhold for min max spawn rate
+        if (rateX < 1.0f) rateX = 1.0f;
+        if (rateX > 50.0f) rateX = 50.0f;
+        
+        // SPACEBAR to spawn particles
+        if (IsKeyDown(KEY_SPACE))
+        {
+            timeX += dt;
+            float intervalX = 1.0f/rateX;
+            while (timeX >= intervalX) // emmits after enough time elapsed
+            {
+                Vector2 spawnPos = {(float)screenWidth/2.0f,(float)screenHeight};
+                Vector2 dir = {GetRandomFloat(-1.0f,1.0), -1.0f};
+                
+                float speed = GetRandomFloat(50.0f,100.0f);
+                float lifetime = GetRandomFloat(2.0f,5.0f);
+                Color color = GetRandomColor();
+                
+                EmitParticle(particles, particleCount, spawnPos, dir, speed, lifetime, color);
+                
+                timeX -= intervalX;
+            }
+        }
+        else
+        {
+            timeX = 0.0f; // resets accumulation of interval time when Spacebar is released
+        }
+        
+        for (int i = 0; i < particleCount; i++)
+        {
+            if(particles[i].isActive)
+            {
+                // update position and speed
+                particles[i].position.x += particles[i].direction.x * particles[i].speed * dt;
+                particles[i].position.y += particles[i].direction.y * particles[i].speed * dt;
+                
+                // updates lifetime
+                particles[i].lifeTime -= dt;
+                if (particles[i].lifeTime <= 0.0f)
+                {
+                    particles[i].isActive = false;
+                }
+            }
+        }
+        
         BeginDrawing();
         ClearBackground(BLACK);
+        
+        for(int i = 0; i < particleCount; i++)
+        {
+            if (particles[i].isActive)
+                DrawCircleV(particles[i].position, 5.0f, particles[i].color);
+        }
+        DrawText(TextFormat("Spacebar Rate (X): %.1f/sec (Left/Right to change)",rateX),10,10,20,RAYWHITE);
+        
         EndDrawing();
     }
 
