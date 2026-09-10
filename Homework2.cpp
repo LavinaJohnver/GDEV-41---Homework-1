@@ -76,10 +76,10 @@ int main()
         // adjusts spawn rate
         if (IsKeyDown(KEY_LEFT)) rateX -= 20.0f * dt;
         if (IsKeyDown(KEY_RIGHT)) rateX += 20.0f * dt;
-        if (IsKeyDown(KEY_UP)) rateY -= 20.0f * dt;
-        if (IsKeyDown(KEY_DOWN)) rateY += 20.0f * dt;
+        if (IsKeyDown(KEY_UP)) rateY += 20.0f * dt;
+        if (IsKeyDown(KEY_DOWN)) rateY -= 20.0f * dt;
         
-        // threshhold for min max spawn rate
+        // threshold for min max spawn rate
         if (rateX < 1.0f) rateX = 1.0f;
         if (rateX > 50.0f) rateX = 50.0f;
         if (rateY < 1.0f) rateY = 1.0f;
@@ -160,6 +160,7 @@ int main()
                 DrawCircleV(particles[i].position, 5.0f, particles[i].color);
         }
         DrawText(TextFormat("Spacebar Rate (X): %.1f/sec (Left/Right to change)",rateX),10,10,20,RAYWHITE);
+        DrawText(TextFormat("Mouse Rate (Y): %.1f/sec (Up/Down to change)",rateY),10,30,20,RAYWHITE);
         
         EndDrawing();
     }
