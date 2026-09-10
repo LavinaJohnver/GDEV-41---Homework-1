@@ -46,7 +46,7 @@ Vector2 NormalizeDirection(Vector2 dir)
     return dir;
 }
 
-void load_settings(const std::string &filepath, 
+void load_settings(const std::string &filepath, bool &hideUI,
     int &outIncreaseRateX, int &outDecreaseRateX, int &outEmitKeyX, 
     int &outIncreaseRateY, int &outDecreaseRateY, int &outEmitButtonY) {
     std::ifstream file(filepath);
@@ -66,6 +66,11 @@ void load_settings(const std::string &filepath,
         std::string key, value_str;
 
         if (std::getline(line_stream, key, '=') && std::getline(line_stream, value_str)) {
+            if (key == "hideUI") {
+                hideUI = (value_str == "true" || value_str == "1");
+                continue;
+            }
+
             try {
                 int value = std::stoi(value_str);
                 if (key == "IncreaseRateX") outIncreaseRateX = value;
@@ -117,7 +122,9 @@ int main()
     int keyDecreaseRateY = KEY_DOWN;
     int mouseEmitButtonY = MOUSE_BUTTON_LEFT;
 
-    load_settings("config.ini",
+    bool hideUI = true;
+
+    load_settings("config.ini", hideUI,
         keyIncreaseRateX, keyDecreaseRateX, keyEmitX,
         keyIncreaseRateY, keyDecreaseRateY, mouseEmitButtonY);
 
@@ -229,8 +236,11 @@ int main()
                 DrawCircleV(particles[i].position, 5.0f, drawColor);
             }
         }
-        DrawText(TextFormat("Spacebar Rate (X): %.1f/sec (Left/Right to change)",rateX),10,10,20,RAYWHITE);
-        DrawText(TextFormat("Mouse Rate (Y): %.1f/sec (Up/Down to change)",rateY),10,30,20,RAYWHITE);
+
+        if (hideUI == false){
+            DrawText(TextFormat("Spacebar Rate (X): %.1f/sec (Left/Right to change)",rateX),10,10,20,RAYWHITE);
+            DrawText(TextFormat("Mouse Rate (Y): %.1f/sec (Up/Down to change)",rateY),10,30,20,RAYWHITE);
+        }
         
         EndDrawing();
     }
