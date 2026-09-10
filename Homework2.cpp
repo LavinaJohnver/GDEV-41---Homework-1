@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "cmath"
 
 struct Particle
 {
@@ -65,6 +66,9 @@ int main()
     float rateX = 20.0f; //default emission rate
     float timeX = 0.0f; //controls emission intervals
 
+    float rateY = 20.0f;
+    float timeY = 0.0f;
+
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
@@ -72,10 +76,14 @@ int main()
         // adjusts spawn rate
         if (IsKeyDown(KEY_LEFT)) rateX -= 20.0f * dt;
         if (IsKeyDown(KEY_RIGHT)) rateX += 20.0f * dt;
+        if (IsKeyDown(KEY_UP)) rateY -= 20.0f * dt;
+        if (IsKeyDown(KEY_DOWN)) rateY += 20.0f * dt;
         
         // threshhold for min max spawn rate
         if (rateX < 1.0f) rateX = 1.0f;
         if (rateX > 50.0f) rateX = 50.0f;
+        if (rateY < 1.0f) rateY = 1.0f;
+        if (rateY > 50.0f) rateY = 50.0f;
         
         // SPACEBAR to spawn particles
         if (IsKeyDown(KEY_SPACE))
@@ -99,6 +107,31 @@ int main()
         else
         {
             timeX = 0.0f; // resets accumulation of interval time when Spacebar is released
+        }
+
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        {
+            timeY += dt;
+            float intervalY = 1.0f/rateY;
+            while (timeY >= intervalY)
+            {
+                Vector2 spawnPos = GetMousePosition();
+ 
+                float angle = GetRandomFloat(0.0f, 2.0f*PI); // random spread
+                Vector2 dir = {cosf(angle), sinf(angle)};
+ 
+                float speed = GetRandomFloat(50.0f,100.0f);
+                float lifetime = GetRandomFloat(0.5f,2.0f);
+                Color color = GetRandomColor();
+ 
+                EmitParticle(particles, particleCount, spawnPos, dir, speed, lifetime, color);
+ 
+                timeY -= intervalY;
+            }
+        }
+        else
+        {
+            timeY = 0.0f; // resets accumulation of interval time when button is released
         }
         
         for (int i = 0; i < particleCount; i++)
