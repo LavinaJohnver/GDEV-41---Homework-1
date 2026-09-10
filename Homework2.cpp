@@ -8,6 +8,7 @@ struct Particle
     Vector2 direction;
     float speed;
     float lifeTime;
+    float maxLifeTime;
     Color color;
 };
 
@@ -29,6 +30,16 @@ Color GetRandomColor()
     };
 }
 
+Vector2 NormalizeDirection(Vector2 dir)
+{
+    float length = sqrtf(dir.x*dir.x + dir.y*dir.y);
+    if (length > 0.0f)
+    {
+        dir.x /= length;
+        dir.y /= length;
+    }
+    return dir;
+}
 void EmitParticle(Particle *particles, int particleCount, Vector2 pos, Vector2 dir, float speed, float lifetime, Color color)
 {
     for(int i = 0; i <particleCount; i++)
@@ -37,12 +48,12 @@ void EmitParticle(Particle *particles, int particleCount, Vector2 pos, Vector2 d
         {
             particles[i].isActive = true;
             particles[i].position = pos;
-            particles[i].direction = dir;
+            particles[i].direction = NormalizeDirection(dir);
             particles[i].speed = speed;
             particles[i].lifeTime = lifetime;
+            particles[i].maxLifeTime = lifetime;
             particles[i].color = color;
             break;
-            
         }
     }
 }
@@ -104,10 +115,7 @@ int main()
                 timeX -= intervalX;
             }
         }
-        else
-        {
-            timeX = 0.0f; // resets accumulation of interval time when Spacebar is released
-        }
+        else timeX = 0.0f;
 
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
         {
@@ -129,10 +137,7 @@ int main()
                 timeY -= intervalY;
             }
         }
-        else
-        {
-            timeY = 0.0f; // resets accumulation of interval time when button is released
-        }
+        else timeY = 0.0f;
         
         for (int i = 0; i < particleCount; i++)
         {
@@ -157,14 +162,23 @@ int main()
         for(int i = 0; i < particleCount; i++)
         {
             if (particles[i].isActive)
-                DrawCircleV(particles[i].position, 5.0f, particles[i].color);
+            {
+                // fade opacity from 100% down to 0% as lifeTime runs out
+                float lifeFraction = particles[i].lifeTime / particles[i].maxLifeTime;
+                if (lifeFraction < 0.0f) lifeFraction = 0.0f;
+                if (lifeFraction > 1.0f) lifeFraction = 1.0f;
+
+                Color drawColor = particles[i].color;
+                drawColor.a = (unsigned char)(lifeFraction * 255.0f);
+
+                DrawCircleV(particles[i].position, 5.0f, drawColor);
+            }
         }
         DrawText(TextFormat("Spacebar Rate (X): %.1f/sec (Left/Right to change)",rateX),10,10,20,RAYWHITE);
         DrawText(TextFormat("Mouse Rate (Y): %.1f/sec (Up/Down to change)",rateY),10,30,20,RAYWHITE);
         
         EndDrawing();
     }
-
     delete[] particles;
 
     CloseWindow();
