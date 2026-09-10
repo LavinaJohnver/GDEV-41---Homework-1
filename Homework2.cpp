@@ -1,6 +1,11 @@
 #include "raylib.h"
 #include "cmath"
 
+#include "fstream"
+#include "sstream"
+#include "iostream"
+#include "string"
+
 struct Particle
 {
     bool isActive;
@@ -40,6 +45,43 @@ Vector2 NormalizeDirection(Vector2 dir)
     }
     return dir;
 }
+
+void load_settings(const std::string &filepath, 
+    int &outIncreaseRateX, int &outDecreaseRateX, int &outEmitKeyX, 
+    int &outIncreaseRateY, int &outDecreaseRateY, int &outEmitButtonY) {
+    std::ifstream file(filepath);
+
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open " << filepath << "!" << std::endl;
+        return;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') { // skip empty lines + comments
+            continue;
+        }
+
+        std::istringstream line_stream(line);
+        std::string key, value_str;
+
+        if (std::getline(line_stream, key, '=') && std::getline(line_stream, value_str)) {
+            try {
+                int value = std::stoi(value_str);
+                if (key == "IncreaseRateX") outIncreaseRateX = value;
+                else if (key == "DecreaseRateX") outDecreaseRateX = value;
+                else if (key == "EmitKeyX") outEmitKeyX = value;
+                else if (key == "IncreaseRateY") outIncreaseRateY = value;
+                else if (key == "DecreaseRateY") outDecreaseRateY = value;
+                else if (key == "EmitButtonY") outEmitButtonY = value;
+            } catch (const std::invalid_argument &e) {
+                std::cerr << "Error: Invalid value for " << key << ": " << value_str << " in " << filepath << "\n";
+            }
+        }
+    }
+    file.close();
+}
+
 void EmitParticle(Particle *particles, int particleCount, Vector2 pos, Vector2 dir, float speed, float lifetime, Color color)
 {
     for(int i = 0; i <particleCount; i++)
@@ -62,9 +104,22 @@ int main()
 {
     const int screenWidth = 800;
     const int screenHeight = 600;
+    const int FPS = 60;
 
     InitWindow(screenWidth, screenHeight, "Particle System");
-    SetTargetFPS(60);
+    SetTargetFPS(FPS);
+
+    // get keybinds from config.ini
+    int keyIncreaseRateX = KEY_RIGHT;
+    int keyDecreaseRateX = KEY_LEFT;
+    int keyEmitX         = KEY_SPACE;
+    int keyIncreaseRateY = KEY_UP;
+    int keyDecreaseRateY = KEY_DOWN;
+    int mouseEmitButtonY = MOUSE_BUTTON_LEFT;
+
+    load_settings("config.ini",
+        keyIncreaseRateX, keyDecreaseRateX, keyEmitX,
+        keyIncreaseRateY, keyDecreaseRateY, mouseEmitButtonY);
 
     const int particleCount = 1000;
     Particle *particles = new Particle[particleCount];
@@ -85,10 +140,10 @@ int main()
         float dt = GetFrameTime();
         
         // adjusts spawn rate
-        if (IsKeyDown(KEY_LEFT)) rateX -= 20.0f * dt;
-        if (IsKeyDown(KEY_RIGHT)) rateX += 20.0f * dt;
-        if (IsKeyDown(KEY_UP)) rateY += 20.0f * dt;
-        if (IsKeyDown(KEY_DOWN)) rateY -= 20.0f * dt;
+        if (IsKeyDown(keyDecreaseRateX)) rateX -= 20.0f * dt;
+        if (IsKeyDown(keyIncreaseRateX)) rateX += 20.0f * dt;
+        if (IsKeyDown(keyIncreaseRateY)) rateY += 20.0f * dt;
+        if (IsKeyDown(keyDecreaseRateY)) rateY -= 20.0f * dt;
         
         // threshold for min max spawn rate
         if (rateX < 1.0f) rateX = 1.0f;
@@ -97,7 +152,7 @@ int main()
         if (rateY > 50.0f) rateY = 50.0f;
         
         // SPACEBAR to spawn particles
-        if (IsKeyDown(KEY_SPACE))
+        if (IsKeyDown(keyEmitX))
         {
             timeX += dt;
             float intervalX = 1.0f/rateX;
@@ -117,7 +172,7 @@ int main()
         }
         else timeX = 0.0f;
 
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+        if (IsMouseButtonDown(mouseEmitButtonY))
         {
             timeY += dt;
             float intervalY = 1.0f/rateY;
