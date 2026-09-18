@@ -8,6 +8,7 @@ const float FPS = 60;
 const float TIMESTEP = 1 / FPS; // Sets the timestep to 1 / FPS. But timestep can be any very small value.
 const float FRICTION = 0.5;
 float elasticity = 1.0f; // Toggled between 0 (sticky) and 1 (bouncy) by pressing SPACE
+const Color BACKGROUND_COLOR = { 67, 173, 101, 255 }; 
 
 struct Ball {
     Vector2 position;
@@ -50,10 +51,16 @@ int main() {
 
     float accumulator = 0;
 
+    Vector2 mouseDragStart = Vector2Zero();
+    bool isDragging = false;
+    const float MAX_DRAG_DISTANCE = 150.0f; 
+    const float FORCE_MULTIPLIER = 8.0f;    
     std::vector<Ball> balls = {
-        { {100, 300}, 100.0f, RED,  1.0f, 1.0f, Vector2Zero(), {150, 50} },
-        { {700, 300}, 100.0f, BLUE, 1.0f, 1.0f, Vector2Zero(), {-150, -30} },
-        { {400, 100}, 100.0f, GREEN, 1.0f, 1.0f, Vector2Zero(), {50, 150} },
+        { {100, 300}, 40.0f, WHITE,  1.0f, 1.0f, Vector2Zero(), {0, 0} },
+        { {400, 300}, 40.0f, BLUE, 1.0f, 1.0f, Vector2Zero(), {0, 0} },
+        { {470, 240}, 40.0f, BLUE, 1.0f, 1.0f, Vector2Zero(), {0, 0} },
+        { {470, 360}, 40.0f, BLUE, 1.0f, 1.0f, Vector2Zero(), {0, 0} },
+        { {540, 300}, 40.0f, BLUE, 1.0f, 1.0f, Vector2Zero(), {0, 0} }
     };
 
 
@@ -64,26 +71,25 @@ int main() {
         if (IsKeyPressed(KEY_SPACE)) {
             elasticity = (elasticity == 0.0f) ? 1.0f : 0.0f;
         }
-
-        Vector2 forces = Vector2Zero(); // every frame set the forces to a 0 vector
-
-        // Adds forces with the magnitude of 100 in the direction given by WASD inputs
-        if(IsKeyDown(KEY_W)) {
-            forces = Vector2Add(forces, {0, -100});
-        }
-        if(IsKeyDown(KEY_A)) {
-            forces = Vector2Add(forces, {-100, 0});
-        }
-        if(IsKeyDown(KEY_S)) {
-            forces = Vector2Add(forces, {0, 100});
-        }
-        if(IsKeyDown(KEY_D)) {
-            forces = Vector2Add(forces, {100, 0});
+        
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            mouseDragStart = GetMousePosition();
+            isDragging = true;
         }
 
-        // Does Vector - Scalar multiplication with the sum of all forces and the inverse mass of the ball
-        // WASD input controls the first ball
-        balls[0].acceleration = Vector2Scale(forces, balls[0].inverse_mass);
+        if (isDragging && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            Vector2 mousePos = GetMousePosition();
+            Vector2 dragVector = Vector2Subtract(mouseDragStart, mousePos);
+            float dragDistance = fminf(Vector2Length(dragVector), MAX_DRAG_DISTANCE);
+
+            if (dragDistance > 0.0f) {
+                Vector2 forceDir = Vector2Normalize(dragVector);
+                Vector2 impulse = Vector2Scale(forceDir, dragDistance * FORCE_MULTIPLIER);
+                balls[0].velocity = Vector2Add(balls[0].velocity, Vector2Scale(impulse, balls[0].inverse_mass));
+            }
+
+            isDragging = false;
+        }
 
         // Physics step
         accumulator += delta_time;
@@ -117,9 +123,13 @@ int main() {
             accumulator -= TIMESTEP;
         }
         BeginDrawing();
-        ClearBackground(WHITE);
+        ClearBackground(BACKGROUND_COLOR);
         for (const auto& b : balls) {
             DrawCircleV(b.position, b.radius, b.color);
+        }
+        if (isDragging) {
+            DrawLineV(mouseDragStart, GetMousePosition(), DARKGRAY);
+            DrawCircleV(mouseDragStart, 5.0f, DARKGRAY);
         }
         EndDrawing();
     }
