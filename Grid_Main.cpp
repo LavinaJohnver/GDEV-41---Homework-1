@@ -82,10 +82,19 @@ static void BuildGrid(const std::vector<Ball>& balls, std::vector<GridCell>& gri
         cell.ball_indices.clear();
 
     for (int i = 0; i < (int)balls.size(); ++i) {
-        int col = (int)Clamp(balls[i].position.x / CELL_SIZE, 0.0f, GRID_COLS - 1.0f);
-        int row = (int)Clamp(balls[i].position.y / CELL_SIZE, 0.0f, GRID_ROWS - 1.0f);
+        const Ball& b = balls[i];
 
-        grid[row * GRID_COLS + col].ball_indices.push_back(i);
+        // Determine bounding box in grid coordinates to handle multi-cell overlaps
+        int min_col = (int)Clamp((b.position.x - b.radius) / CELL_SIZE, 0.0f, GRID_COLS - 1.0f);
+        int max_col = (int)Clamp((b.position.x + b.radius) / CELL_SIZE, 0.0f, GRID_COLS - 1.0f);
+        int min_row = (int)Clamp((b.position.y - b.radius) / CELL_SIZE, 0.0f, GRID_ROWS - 1.0f);
+        int max_row = (int)Clamp((b.position.y + b.radius) / CELL_SIZE, 0.0f, GRID_ROWS - 1.0f);
+
+        for (int r = min_row; r <= max_row; ++r) {
+            for (int c = min_col; c <= max_col; ++c) {
+                grid[r * GRID_COLS + c].ball_indices.push_back(i);
+            }
+        }
     }
 }
 static void ResolveCollision(Ball& a, Ball& b) {
@@ -163,7 +172,7 @@ int main() {
     std::vector<GridCell> grid = CreateGrid();
 
     float accumulator = 0.0f;
-    bool  showGrid    = false;
+    bool  showGrid    = true ;
 
     while (!WindowShouldClose()) {
         float delta_time = GetFrameTime();
@@ -181,7 +190,7 @@ int main() {
         }
         
         if (IsKeyPressed(KEY_Q))
-            showGrid  = !showGrid; 
+            showGrid  = !showGrid;
 
         // Physics step
         accumulator += delta_time;
@@ -215,13 +224,39 @@ int main() {
         ClearBackground(BLACK);
 
         if (showGrid) {
+            for (int row = 0; row < GRID_ROWS; ++row) {
+                for (int col = 0; col < GRID_COLS; ++col) {
+                    const GridCell& cell = grid[row * GRID_COLS + col];
+
+                    // 1. Draw grid cell outlines
+                    DrawRectangleLinesEx(
+                        Rectangle{ cell.position.x, cell.position.y, cell.width, cell.height },
+                        1.0f,
+                        Fade(DARKGRAY, 0.4f)
+                    );
+
+                    // 2. Render grid array indices (top-left)
+                    DrawText(TextFormat("(%d,%d)", col, row), (int)cell.position.x + 3, (int)cell.position.y + 3, 10, DARKGRAY);
+
+                    // 3. Render particle count in cell center (displays 0 if empty)
+                    int count = (int)cell.ball_indices.size();
+                    Color countColor = (count > 0) ? YELLOW : DARKGRAY;
+
+                    DrawText(
+                        TextFormat("%d", count),
+                        (int)(cell.position.x + cell.width / 2.0f - 4.0f),
+                        (int)(cell.position.y + cell.height / 2.0f - 6.0f),
+                        14,
+                        countColor
+                    );
+                }
+            }
         }
 
         for (const Ball& ball : balls) {
             DrawCircleV(ball.position, ball.radius, ball.color);
         }
 
-        int naive = (int)balls.size() * ((int)balls.size() - 1) / 2;
         DrawText(TextFormat("# OF SPACE presses %d", SPAWN_COUNT), 12, 20, 20, RAYWHITE);
         DrawText(TextFormat("PARTICLES %d", PARTICLE_COUNT), 12, 40, 20, RAYWHITE);
         DrawText("SPACE spawn   Q to toggle grid",
@@ -229,4 +264,7 @@ int main() {
 
         EndDrawing();
     }
+    
+    CloseWindow();
+    return 0;
 }
