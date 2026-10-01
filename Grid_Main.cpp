@@ -31,7 +31,7 @@ struct GridCell {
     float height;
 };
 
-static Ball MakeBall(const Vector2& at) {
+static Ball SpawnBall(const Vector2& at) {
     float radius = (float)GetRandomValue((int)MIN_RADIUS, (int)MAX_RADIUS);
 
     float mass = radius * radius;
@@ -63,7 +63,7 @@ int main() {
         float delta_time = GetFrameTime();
 
         if (IsKeyPressed(KEY_SPACE)){
-            balls.push_back(MakeBall(spawnPoint));
+            balls.push_back(SpawnBall(spawnPoint));
             spawnTimer = 0.0f;
         }
         
@@ -76,21 +76,41 @@ int main() {
             // ------ SEMI-IMPLICIT EULER INTEGRATION -------
             // Sequential motion: each ball fully computes its velocity, position, and
             // collisions against every other ball before moving on to the next ball
+            for (Ball& ball : balls) {
+                ball.position = Vector2Add(ball.position, Vector2Scale(ball.velocity, TIMESTEP));
+
+                if (ball.position.x - ball.radius <= 0.0f) {
+                    ball.position.x = ball.radius;
+                    ball.velocity.x = -ball.velocity.x * WALL_ELASTICITY;
+                } else if (ball.position.x + ball.radius >= WINDOW_WIDTH) {
+                    ball.position.x = WINDOW_WIDTH - ball.radius;
+                    ball.velocity.x = -ball.velocity.x * WALL_ELASTICITY;
+                }
+
+                if (ball.position.y - ball.radius <= 0.0f) {
+                    ball.position.y = ball.radius;
+                    ball.velocity.y = -ball.velocity.y * WALL_ELASTICITY;
+                } else if (ball.position.y + ball.radius >= WINDOW_HEIGHT) {
+                    ball.position.y = WINDOW_HEIGHT - ball.radius;
+                    ball.velocity.y = -ball.velocity.y * WALL_ELASTICITY;
+                }
+            }
+
+            accumulator -= TIMESTEP;
         }
 
         BeginDrawing();
-        ClearBackground(BLACK);
+        ClearBackground(WHITE);
 
         if (showGrid) {
             for (int c = 1; c < (WINDOW_WIDTH + (int)CELL_SIZE - 1) / (int)CELL_SIZE; ++c)
             {
-                DrawLine(c * (int)CELL_SIZE, 0, c * (int)CELL_SIZE, WINDOW_HEIGHT, GRAY);
+                DrawLine(c * (int)CELL_SIZE, 0, c * (int)CELL_SIZE, WINDOW_HEIGHT, Fade(WHITE, 0.1f));
             }
         }
 
-        for (const auto& b : balls) {
-            DrawCircleV(b.position, b.radius, b.color);
-            DrawCircleLinesV(b.position, b.radius, Fade(BLACK, 0.35f));
+        for (const Ball& ball : balls) {
+            DrawCircleV(ball.position, ball.radius, ball.color);
         }
 
         int naive = (int)balls.size() * ((int)balls.size() - 1) / 2;
