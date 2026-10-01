@@ -10,18 +10,23 @@ const float TIMESTEP      = 1.0f / FPS;
 
 const float MIN_RADIUS = 5.0f;
 const float MAX_RADIUS = 10.0f;
+const float BIG_RADIUS = 25.0f;
 
-const float ELASTICITY      = 0.92f; 
-const float WALL_ELASTICITY = 0.88f; 
-const float CELL_SIZE = MAX_RADIUS * 2.0f;
+const float CELL_SIZE = BIG_RADIUS * 2.0f;
 const float SPAWN_SPEED_MIN = 100.0f;
 const float SPAWN_SPEED_MAX = 300.0f;
+
+const int GRID_COLS = (WINDOW_WIDTH  + (int)CELL_SIZE - 1) / (int)CELL_SIZE;
+const int GRID_ROWS = (WINDOW_HEIGHT + (int)CELL_SIZE - 1) / (int)CELL_SIZE;
+
+int SPAWN_COUNT = 0;
+int PARTICLE_COUNT = 0;
 
 struct Ball {
     Vector2 position;
     Vector2 velocity;
     float radius;
-    float inverse_mass;   // 1 / mass, since every impulse divides by mass
+    float inverse_mass;
     Color color;
 };
 
@@ -29,10 +34,17 @@ struct GridCell {
     Vector2 position;
     float width;
     float height;
+
+    // stores balls that are colliding within the cell
+    std::vector<int> ball_indices;
 };
 
-static Ball SpawnBall(const Vector2& at) {
+static Ball SpawnBall(const Vector2& at, bool big) {
     float radius = (float)GetRandomValue((int)MIN_RADIUS, (int)MAX_RADIUS);
+    
+    if (big == true) radius = BIG_RADIUS;
+
+    PARTICLE_COUNT++;
 
     float mass = radius * radius;
 
@@ -47,6 +59,99 @@ static Ball SpawnBall(const Vector2& at) {
     };
 }
 
+static std::vector<GridCell> CreateGrid() {
+    std::vector<GridCell> grid;
+    grid.reserve(GRID_COLS * GRID_ROWS);
+
+    for (int row = 0; row < GRID_ROWS; ++row) {
+        for (int col = 0; col < GRID_COLS; ++col) {
+            Vector2 position = { col * CELL_SIZE, row * CELL_SIZE };
+
+            float width  = fminf(CELL_SIZE, WINDOW_WIDTH  - position.x);
+            float height = fminf(CELL_SIZE, WINDOW_HEIGHT - position.y);
+
+            grid.push_back(GridCell{ position, width, height, {} });
+        }
+    }
+
+    return grid;
+}
+
+static void BuildGrid(const std::vector<Ball>& balls, std::vector<GridCell>& grid) {
+    for (GridCell& cell : grid)
+        cell.ball_indices.clear();
+
+    for (int i = 0; i < (int)balls.size(); ++i) {
+        int col = (int)Clamp(balls[i].position.x / CELL_SIZE, 0.0f, GRID_COLS - 1.0f);
+        int row = (int)Clamp(balls[i].position.y / CELL_SIZE, 0.0f, GRID_ROWS - 1.0f);
+
+        grid[row * GRID_COLS + col].ball_indices.push_back(i);
+    }
+}
+static void ResolveCollision(Ball& a, Ball& b) {
+    Vector2 delta    = Vector2Subtract(b.position, a.position);
+    float   distance = Vector2Length(delta);
+    float   contact  = a.radius + b.radius;
+
+    if (distance >= contact) return;
+
+    Vector2 normal;
+    if (distance > 0.0001f) {
+        normal = Vector2Scale(delta, 1.0f / distance);
+    } else {
+        normal   = { 1.0f, 0.0f };
+        distance = 0.0f;
+    }
+
+    float inverse_mass_sum = a.inverse_mass + b.inverse_mass;
+    if (inverse_mass_sum <= 0.0f) return;
+
+    float   penetration = contact - distance;
+    Vector2 correction  = Vector2Scale(normal, penetration / inverse_mass_sum);
+
+    a.position = Vector2Subtract(a.position, Vector2Scale(correction, a.inverse_mass));
+    b.position = Vector2Add(     b.position, Vector2Scale(correction, b.inverse_mass));
+
+    // --- impulse ---
+    Vector2 relative_velocity = Vector2Subtract(b.velocity, a.velocity);
+    float   approach_speed    = Vector2DotProduct(relative_velocity, normal);
+
+    if (approach_speed > 0.0f) return;
+
+    float   impulse        = -2.0f * approach_speed / inverse_mass_sum;
+    Vector2 impulse_vector = Vector2Scale(normal, impulse);
+
+    a.velocity = Vector2Subtract(a.velocity, Vector2Scale(impulse_vector, a.inverse_mass));
+    b.velocity = Vector2Add(     b.velocity, Vector2Scale(impulse_vector, b.inverse_mass));
+}
+
+static void ResolveCollisions(std::vector<Ball>& balls, const std::vector<GridCell>& grid) {
+    for (int row = 0; row < GRID_ROWS; ++row) {
+        for (int col = 0; col < GRID_COLS; ++col) {
+
+            const GridCell& cell = grid[row * GRID_COLS + col];
+            if (cell.ball_indices.empty()) continue;
+
+            for (int neighbour_row = row - 1; neighbour_row <= row + 1; ++neighbour_row) {
+                if (neighbour_row < 0 || neighbour_row >= GRID_ROWS) continue;
+
+                for (int neighbour_col = col - 1; neighbour_col <= col + 1; ++neighbour_col) {
+                    if (neighbour_col < 0 || neighbour_col >= GRID_COLS) continue;
+
+                    const GridCell& neighbour = grid[neighbour_row * GRID_COLS + neighbour_col];
+
+                    for (int i : cell.ball_indices) {
+                        for (int j : neighbour.ball_indices) {
+                            if (j <= i) continue;
+                            ResolveCollision(balls[i], balls[j]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 int main() {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Grid-Based Ball Collision");
     SetTargetFPS((int)FPS);
@@ -55,58 +160,61 @@ int main() {
 
     std::vector<Ball> balls;
 
+    std::vector<GridCell> grid = CreateGrid();
+
     float accumulator = 0.0f;
-    float spawnTimer = 0.0f;
     bool  showGrid    = false;
 
     while (!WindowShouldClose()) {
         float delta_time = GetFrameTime();
 
         if (IsKeyPressed(KEY_SPACE)){
-            balls.push_back(SpawnBall(spawnPoint));
-            spawnTimer = 0.0f;
+            if((SPAWN_COUNT+1) % 11 == 0 && SPAWN_COUNT != 0){
+                balls.push_back(SpawnBall(spawnPoint, true));
+                SPAWN_COUNT++;
+            } else{
+                for(int i = 0; i < 25; i++){
+                    balls.push_back(SpawnBall(spawnPoint, false));
+                }
+                SPAWN_COUNT++;
+            }
         }
         
-        if (IsKeyPressed(KEY_G))
+        if (IsKeyPressed(KEY_Q))
             showGrid  = !showGrid; 
 
         // Physics step
         accumulator += delta_time;
         while(accumulator >= TIMESTEP) {
-            // ------ SEMI-IMPLICIT EULER INTEGRATION -------
-            // Sequential motion: each ball fully computes its velocity, position, and
-            // collisions against every other ball before moving on to the next ball
             for (Ball& ball : balls) {
                 ball.position = Vector2Add(ball.position, Vector2Scale(ball.velocity, TIMESTEP));
 
                 if (ball.position.x - ball.radius <= 0.0f) {
                     ball.position.x = ball.radius;
-                    ball.velocity.x = -ball.velocity.x * WALL_ELASTICITY;
+                    ball.velocity.x = -ball.velocity.x;
                 } else if (ball.position.x + ball.radius >= WINDOW_WIDTH) {
                     ball.position.x = WINDOW_WIDTH - ball.radius;
-                    ball.velocity.x = -ball.velocity.x * WALL_ELASTICITY;
+                    ball.velocity.x = -ball.velocity.x;
                 }
 
                 if (ball.position.y - ball.radius <= 0.0f) {
                     ball.position.y = ball.radius;
-                    ball.velocity.y = -ball.velocity.y * WALL_ELASTICITY;
+                    ball.velocity.y = -ball.velocity.y;
                 } else if (ball.position.y + ball.radius >= WINDOW_HEIGHT) {
                     ball.position.y = WINDOW_HEIGHT - ball.radius;
-                    ball.velocity.y = -ball.velocity.y * WALL_ELASTICITY;
+                    ball.velocity.y = -ball.velocity.y;
                 }
             }
+            BuildGrid(balls, grid);
+            ResolveCollisions(balls, grid);
 
             accumulator -= TIMESTEP;
         }
 
         BeginDrawing();
-        ClearBackground(WHITE);
+        ClearBackground(BLACK);
 
         if (showGrid) {
-            for (int c = 1; c < (WINDOW_WIDTH + (int)CELL_SIZE - 1) / (int)CELL_SIZE; ++c)
-            {
-                DrawLine(c * (int)CELL_SIZE, 0, c * (int)CELL_SIZE, WINDOW_HEIGHT, Fade(WHITE, 0.1f));
-            }
         }
 
         for (const Ball& ball : balls) {
@@ -114,7 +222,8 @@ int main() {
         }
 
         int naive = (int)balls.size() * ((int)balls.size() - 1) / 2;
-        //DrawText(TextFormat("PARTICLES %d", GetParticles()), 12, 60, 20, RAYWHITE);
+        DrawText(TextFormat("# OF SPACE presses %d", SPAWN_COUNT), 12, 20, 20, RAYWHITE);
+        DrawText(TextFormat("PARTICLES %d", PARTICLE_COUNT), 12, 40, 20, RAYWHITE);
         DrawText("SPACE spawn   Q to toggle grid",
                  12, WINDOW_HEIGHT - 28, 18, Fade(RAYWHITE, 0.6f));
 
