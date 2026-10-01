@@ -14,6 +14,8 @@ const float MAX_RADIUS = 10.0f;
 const float ELASTICITY      = 0.92f; 
 const float WALL_ELASTICITY = 0.88f; 
 const float CELL_SIZE = MAX_RADIUS * 2.0f;
+const float SPAWN_SPEED_MIN = 100.0f;
+const float SPAWN_SPEED_MAX = 300.0f;
 
 struct Ball {
     Vector2 position;
@@ -27,9 +29,9 @@ struct GridCell {
     Vector2 position;
     float width;
     float height;
-}
+};
 
-static Ball MakeBall(Vector2 at) {
+static Ball MakeBall(const Vector2& at) {
     float radius = (float)GetRandomValue((int)MIN_RADIUS, (int)MAX_RADIUS);
 
     float mass = radius * radius;
@@ -53,7 +55,8 @@ int main() {
 
     std::vector<Ball> balls;
 
-    float accumulator = 0.0f
+    float accumulator = 0.0f;
+    float spawnTimer = 0.0f;
     bool  showGrid    = false;
 
     while (!WindowShouldClose()) {
@@ -79,7 +82,10 @@ int main() {
         ClearBackground(BLACK);
 
         if (showGrid) {
-            for (int c = 1; c < GRID_COLS; ++c)
+            for (int c = 1; c < (WINDOW_WIDTH + (int)CELL_SIZE - 1) / (int)CELL_SIZE; ++c)
+            {
+                DrawLine(c * (int)CELL_SIZE, 0, c * (int)CELL_SIZE, WINDOW_HEIGHT, GRAY);
+            }
         }
 
         for (const auto& b : balls) {
