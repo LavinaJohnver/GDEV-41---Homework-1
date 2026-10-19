@@ -162,7 +162,7 @@ int main()
         }
         if (uiLibrary.CheckBox(3, "Lock screen size", { 10, 60, 200, 24 }, lockScreenSize))
         {
-            std::cout << "Screen size locked!" << std::endl;
+            // std::cout << "Screen size locked!" << std::endl;
         }
         EndDrawing();
     }
