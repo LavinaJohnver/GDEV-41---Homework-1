@@ -52,8 +52,8 @@ struct UiLibrary
             }
         }
 
-        // If we are currently the hot widget and if the user pressed the 
-        // left mouse button, that means the user started interacting with 
+        // If we are currently the hot widget and if the user pressed the
+        // left mouse button, that means the user started interacting with
         // this widget, so we set this widget as active
         else if (id == hot && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
@@ -64,9 +64,9 @@ struct UiLibrary
         Color TextColor = RAYWHITE;
 
         if (active == id && hot == id) // Button is held down
-        { 
-            ButtonColor = WHITE; 
-            TextColor = BLACK; 
+        {
+            ButtonColor = WHITE;
+            TextColor = BLACK;
         }
         else if (hot == id) ButtonColor = LIGHTGRAY; // Button is hovered over
 
@@ -83,8 +83,8 @@ struct UiLibrary
         if (CheckCollisionPointRec(GetMousePosition(), bounds)) hot = id;
         else if (hot == id) hot = -1;
 
-        // Also identical to Button, except a completed click 
-        // reverses the connected variable's state instead of 
+        // Also identical to Button, except a completed click
+        // reverses the connected variable's state instead of
         // returning true
         if (id == active)
         {
@@ -144,17 +144,22 @@ int main()
 
         if (uiLibrary.Button(0, "800 x 600", { 90, 10, 100, 40 }))
         {
-            std::cout << "Hello!" << std::endl;
+            if (!lockScreenSize) {
+                SetWindowSize(800, 600);
+            }
         }
         if (uiLibrary.Button(1, "1280 x 720", { 200, 10, 100, 40 }))
         {
-            std::cout << "Hi!" << std::endl;
+            if (!lockScreenSize) {
+                SetWindowSize(1280, 720);
+            }
         }
         if (uiLibrary.Button(2, "1366 x 768", { 310, 10, 100, 40 }))
         {
-            std::cout << "Hola!" << std::endl;
+            if (!lockScreenSize) {
+                SetWindowSize(1366, 768);
+            }
         }
-
         if (uiLibrary.CheckBox(3, "Lock screen size", { 10, 60, 200, 24 }, lockScreenSize))
         {
             std::cout << "Screen size locked!" << std::endl;
