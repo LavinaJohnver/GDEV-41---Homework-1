@@ -6,7 +6,7 @@
     [x] 4.  Ball-ball collision + bounce off screen edges
     [x] 5.  Fixed timestep, sequential motion, static (discrete) collision detection
     [x] 6.  No cap on ball count (vector grows freely; the tree will store INDICES, not pointers)
-    [ ] 7.  Define QuadTree node: Rectangle bounds, int depth, std::vector<int> items,
+    [x] 7.  Define QuadTree node: Rectangle bounds, int depth, std::vector<int> items,
             4 children (std::unique_ptr or raw pointers), MAX_DEPTH and MAX_ITEMS constants
             (follow the QuadTree slide set)
     [ ] 8.  Insert(index): store in a leaf if under capacity (or at MAX_DEPTH),
@@ -26,6 +26,7 @@
 #include "raymath.h"
 #include <vector>
 #include <cmath>
+#include <memory>
 
 const int   WINDOW_WIDTH  = 1280;
 const int   WINDOW_HEIGHT = 720;
@@ -50,8 +51,23 @@ struct Ball {
     Vector2 position;
     Vector2 velocity;
     float radius;
-    float inverse_mass; 
+    float inverse_mass;
     Color color;
+};
+
+const int MAX_DEPTH = 6;  
+const int MAX_ITEMS = 8;  
+
+struct QuadTreeNode {
+    Rectangle bounds;
+    int depth;
+    std::vector<int> items;
+    // children[0] = top-left, [1] = top-right, [2] = bottom-left, [3] = bottom-right
+    std::unique_ptr<QuadTreeNode> children[4];
+
+    QuadTreeNode(Rectangle bounds, int depth) : bounds(bounds), depth(depth) {}
+
+    bool IsLeaf() const { return children[0] == nullptr; }
 };
 
 static Ball SpawnBall(const Vector2& at, float radius, float mass) {
