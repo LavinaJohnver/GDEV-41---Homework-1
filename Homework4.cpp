@@ -98,7 +98,7 @@ static void Subdivide(QuadTreeNode& node, const std::vector<Ball>& balls) {
     float x = node.bounds.x;
     float y = node.bounds.y;
 
-    // split leaf into 4 quadrants (WHAAAT)
+    // split leaf into 4 quadrants
     node.children[0] = std::make_unique<QuadTreeNode>(Rectangle{x, y, hw, hh}, node.depth + 1);
     node.children[1] = std::make_unique<QuadTreeNode>(Rectangle{x + hw, y, hw, hh}, node.depth + 1);
     node.children[2] = std::make_unique<QuadTreeNode>(Rectangle{x, y + hh, hw, hh}, node.depth + 1);
@@ -119,7 +119,6 @@ static void Insert(QuadTreeNode& node, int index, const std::vector<Ball>& balls
         }
         return;
     }
-
 
     node.items.push_back(index);
 
@@ -216,14 +215,6 @@ static void Query(const QuadTreeNode& node, const Rectangle& range,
     }
 }
 
-// TODO: replace with a QuadTree query
-//static void GetCandidates(int i, const std::vector<Ball>& balls, std::vector<int>& out) {
-//    out.clear();
-//    for (int j = 0; j < (int)balls.size(); ++j) {
-//        if (j != i) out.push_back(j);
-//    }
-//}
-
 int main() {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "QuadTree Ball Collision");
     SetTargetFPS((int)FPS);
@@ -269,22 +260,16 @@ int main() {
 
             added.assign(balls.size(), false);
 
-            // TODO: buid the QuadTree here
-
             // Sequential motion: each ball fully computes its velocity, position, and collisions against every other ball before moving on to the next ball
             for (int i = 0; i < (int)balls.size(); ++i) {
                 Ball& ball = balls[i];
                 ball.position = Vector2Add(ball.position, Vector2Scale(ball.velocity, TIMESTEP));
                 ResolveWall(ball);
 
-                //GetCandidates(i, balls, candidates);
-                //for (int j : candidates) {
-                //    ResolveCollision(balls[i], balls[j]);
-                //    checksThisStep++;
-                //}
-
                 candidates.clear();
-                added[i] = true;                       // don't return ball i itself
+
+                // clear ball i as already marked so it doesn't appear in its own candidate list
+                added[i] = true;                       
                 Query(tree, BallBounds(ball, QUERY_PADDING), candidates, added);
 
                 for (int j : candidates) {
@@ -292,7 +277,8 @@ int main() {
                     checksThisStep++;
                 }
 
-                added[i] = false;                      // undo, ready for ball i+1
+
+                added[i] = false;                  
                 for (int j : candidates) added[j] = false;
             }
 
