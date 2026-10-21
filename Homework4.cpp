@@ -9,14 +9,14 @@
     [x] 7.  Define QuadTree node: Rectangle bounds, int depth, std::vector<int> items,
             4 children (std::unique_ptr or raw pointers), MAX_DEPTH and MAX_ITEMS constants
             (follow the QuadTree slide set)
-    [ ] 8.  Insert(index): store in a leaf if under capacity (or at MAX_DEPTH),
+    [X] 8.  Insert(index): store in a leaf if under capacity (or at MAX_DEPTH),
             otherwise subdivide and push the ball into every child its AABB overlaps
-    [ ] 9.  Subdivide(): create the 4 quadrant children and re-insert existing items
-    [ ] 10. Query(Rectangle range, std::vector<int>& out): gather indices from overlapping
+    [X] 9.  Subdivide(): create the 4 quadrant children and re-insert existing items
+    [X] 10. Query(Rectangle range, std::vector<int>& out): gather indices from overlapping
             nodes, de-duplicate if a ball can live in several leaves
-    [ ] 11. Clear()/rebuild the tree every physics step
-    [ ] 12. Replace the brute-force GetCandidates() with a QuadTree query
-    [ ] 13. Skip self-checks (j != i) and duplicate candidates
+    [X] 11. Clear()/rebuild the tree every physics step
+    [X] 12. Replace the brute-force GetCandidates() with a QuadTree query
+    [X] 13. Skip self-checks (j != i) and duplicate candidates
     [ ] 14. Draw the QuadTree node rectangles when Q is toggled
     [ ] 15. Compare "checks/step" on the HUD: brute force vs QuadTree at 1000+ balls
     [ ] 16. Choose and justify MAX_DEPTH / MAX_ITEMS
@@ -47,6 +47,8 @@ const float WALL_ELASTICITY = 0.88f;
 const float SPAWN_SPEED_MIN = 100.0f;
 const float SPAWN_SPEED_MAX = 300.0f;
 
+const float QUERY_PADDING = SPAWN_SPEED_MAX * TIMESTEP;
+
 struct Ball {
     Vector2 position;
     Vector2 velocity;
@@ -68,7 +70,64 @@ struct QuadTreeNode {
     QuadTreeNode(Rectangle bounds, int depth) : bounds(bounds), depth(depth) {}
 
     bool IsLeaf() const { return children[0] == nullptr; }
+
+    void Clear() {
+        items.clear();
+        for (int i = 0; i < 4; ++i) children[i].reset();
+    }
 };
+
+static bool RectOverlap(const Rectangle& a, const Rectangle& b) {
+    return a.x < b.x + b.width  && a.x + a.width  > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+// Bounding/collision box around of each ball
+static Rectangle BallBounds(const Ball& ball, float pad = 0.0f) {
+    float r = ball.radius + pad;
+    return Rectangle{ ball.position.x - r, ball.position.y - r, r * 2.0f, r * 2.0f };
+}
+
+
+// ---- QUADTREE STUFF
+
+static void Insert(QuadTreeNode& node, int index, const std::vector<Ball>& balls);
+
+static void Subdivide(QuadTreeNode& node, const std::vector<Ball>& balls) {
+    float hw = node.bounds.width * 0.5f;
+    float hh = node.bounds.height * 0.5f;
+    float x = node.bounds.x;
+    float y = node.bounds.y;
+
+    // split leaf into 4 quadrants (WHAAAT)
+    node.children[0] = std::make_unique<QuadTreeNode>(Rectangle{x, y, hw, hh}, node.depth + 1);
+    node.children[1] = std::make_unique<QuadTreeNode>(Rectangle{x + hw, y, hw, hh}, node.depth + 1);
+    node.children[2] = std::make_unique<QuadTreeNode>(Rectangle{x, y + hh, hw, hh}, node.depth + 1);
+    node.children[3] = std::make_unique<QuadTreeNode>(Rectangle{x + hw, y + hh, hw, hh}, node.depth + 1);
+
+    std::vector<int> moved;
+    moved.swap(node.items);
+    for (int index:moved)
+        Insert(node, index, balls);
+}
+
+static void Insert(QuadTreeNode& node, int index, const std::vector<Ball>& balls) {
+    if (!node.IsLeaf()) {
+        Rectangle box = BallBounds(balls[index]);
+        for (int i = 0; i < 4; i++) {
+            if (RectOverlap(box, node.children[i]->bounds))
+                Insert(*node.children[i], index, balls);
+        }
+        return;
+    }
+
+
+    node.items.push_back(index);
+
+    // split only when leaf is over cap and its not the deepest yet
+    if ((int)node.items.size() > MAX_ITEMS && node.depth < MAX_DEPTH) {
+        Subdivide(node, balls);
+    }
+}
 
 static Ball SpawnBall(const Vector2& at, float radius, float mass) {
     // random direction + speed
@@ -138,13 +197,32 @@ static void ResolveCollision(Ball& a, Ball& b) {
     b.velocity = Vector2Add(b.velocity, Vector2Scale(impulse, b.inverse_mass));
 }
 
-// TODO: replace with a QuadTree query
-static void GetCandidates(int i, const std::vector<Ball>& balls, std::vector<int>& out) {
-    out.clear();
-    for (int j = 0; j < (int)balls.size(); ++j) {
-        if (j != i) out.push_back(j);
+static void Query(const QuadTreeNode& node, const Rectangle& range,
+    std::vector<int>& out, std::vector<bool>& added) {
+    if (!RectOverlap(range, node.bounds)) return;
+
+    if (node.IsLeaf()) {
+        for (int index : node.items) {
+            if (added[index]) continue;
+
+            added[index] = true;
+            out.push_back(index);
+        }
+        return;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        Query(*node.children[i], range, out, added);
     }
 }
+
+// TODO: replace with a QuadTree query
+//static void GetCandidates(int i, const std::vector<Ball>& balls, std::vector<int>& out) {
+//    out.clear();
+//    for (int j = 0; j < (int)balls.size(); ++j) {
+//        if (j != i) out.push_back(j);
+//    }
+//}
 
 int main() {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "QuadTree Ball Collision");
@@ -152,6 +230,9 @@ int main() {
 
     std::vector<Ball> balls;
     std::vector<int>  candidates;
+    std::vector<bool> added; 
+
+    QuadTreeNode tree(Rectangle{ 0.0f, 0.0f, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT }, 0);
 
     float accumulator      = 0.0f;
     int   normalSpawnCount = 0;
@@ -182,6 +263,12 @@ int main() {
         while (accumulator >= TIMESTEP) {
             checksThisStep = 0;
 
+            tree.Clear();
+            for (int i = 0; i < (int)balls.size(); ++i)
+                Insert(tree, i, balls);
+
+            added.assign(balls.size(), false);
+
             // TODO: buid the QuadTree here
 
             // Sequential motion: each ball fully computes its velocity, position, and collisions against every other ball before moving on to the next ball
@@ -190,11 +277,23 @@ int main() {
                 ball.position = Vector2Add(ball.position, Vector2Scale(ball.velocity, TIMESTEP));
                 ResolveWall(ball);
 
-                GetCandidates(i, balls, candidates);
+                //GetCandidates(i, balls, candidates);
+                //for (int j : candidates) {
+                //    ResolveCollision(balls[i], balls[j]);
+                //    checksThisStep++;
+                //}
+
+                candidates.clear();
+                added[i] = true;                       // don't return ball i itself
+                Query(tree, BallBounds(ball, QUERY_PADDING), candidates, added);
+
                 for (int j : candidates) {
                     ResolveCollision(balls[i], balls[j]);
                     checksThisStep++;
                 }
+
+                added[i] = false;                      // undo, ready for ball i+1
+                for (int j : candidates) added[j] = false;
             }
 
             accumulator -= TIMESTEP;
