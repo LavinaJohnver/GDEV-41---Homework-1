@@ -122,8 +122,7 @@ static void Insert(QuadTreeNode& node, int index, const std::vector<Ball>& balls
 
     node.items.push_back(index);
 
-    // split only when leaf is over cap and its not the deepest yet
-    if ((int)node.items.size() > MAX_ITEMS && node.depth < MAX_DEPTH) {
+    if (!node.items.empty() && node.depth < MAX_DEPTH) {
         Subdivide(node, balls);
     }
 }
@@ -216,7 +215,7 @@ static void Query(const QuadTreeNode& node, const Rectangle& range,
 }
 
 static void DrawQuadTree(const QuadTreeNode& node) {
-    // Draw the node's bounding box with a subtle fade so it doesn't clutter the screen
+    // Draw the node's bounding box
     DrawRectangleLinesEx(node.bounds, 1.0f, Fade(LIGHTGRAY, 0.25f));
 
     if (!node.IsLeaf()) {
