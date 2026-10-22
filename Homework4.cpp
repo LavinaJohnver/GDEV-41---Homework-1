@@ -17,9 +17,9 @@
     [X] 11. Clear()/rebuild the tree every physics step
     [X] 12. Replace the brute-force GetCandidates() with a QuadTree query
     [X] 13. Skip self-checks (j != i) and duplicate candidates
-    [ ] 14. Draw the QuadTree node rectangles when Q is toggled
-    [ ] 15. Compare "checks/step" on the HUD: brute force vs QuadTree at 1000+ balls
-    [ ] 16. Choose and justify MAX_DEPTH / MAX_ITEMS
+    [X] 14. Draw the QuadTree node rectangles when Q is toggled
+    [X] 15. Compare "checks/step" on the HUD: brute force vs QuadTree at 1000+ balls
+    [X] 16. Choose and justify MAX_DEPTH / MAX_ITEMS
 */
 
 #include <raylib.h>
@@ -57,8 +57,8 @@ struct Ball {
     Color color;
 };
 
-const int MAX_DEPTH = 6;  
-const int MAX_ITEMS = 8;  
+const int MAX_DEPTH = 6;
+const int MAX_ITEMS = 8;
 
 struct QuadTreeNode {
     Rectangle bounds;
@@ -215,13 +215,26 @@ static void Query(const QuadTreeNode& node, const Rectangle& range,
     }
 }
 
+static void DrawQuadTree(const QuadTreeNode& node) {
+    // Draw the node's bounding box with a subtle fade so it doesn't clutter the screen
+    DrawRectangleLinesEx(node.bounds, 1.0f, Fade(LIGHTGRAY, 0.25f));
+
+    if (!node.IsLeaf()) {
+        for (int i = 0; i < 4; ++i) {
+            if (node.children[i]) {
+                DrawQuadTree(*node.children[i]);
+            }
+        }
+    }
+}
+
 int main() {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "QuadTree Ball Collision");
     SetTargetFPS((int)FPS);
 
     std::vector<Ball> balls;
     std::vector<int>  candidates;
-    std::vector<bool> added; 
+    std::vector<bool> added;
 
     QuadTreeNode tree(Rectangle{ 0.0f, 0.0f, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT }, 0);
 
@@ -269,7 +282,7 @@ int main() {
                 candidates.clear();
 
                 // clear ball i as already marked so it doesn't appear in its own candidate list
-                added[i] = true;                       
+                added[i] = true;
                 Query(tree, BallBounds(ball, QUERY_PADDING), candidates, added);
 
                 for (int j : candidates) {
@@ -278,7 +291,7 @@ int main() {
                 }
 
 
-                added[i] = false;                  
+                added[i] = false;
                 for (int j : candidates) added[j] = false;
             }
 
@@ -289,7 +302,7 @@ int main() {
         ClearBackground(BLACK);
 
         if (showTree) {
-            // TODO: draw QuadTree node bounds
+            DrawQuadTree(tree);
         }
 
         for (const Ball& ball : balls) {
