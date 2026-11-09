@@ -12,18 +12,18 @@
     [x] 7.  RenderSystem: draw every entity with Position + CircleShape
     [x] 8.  RollProperties(): 50% normal / 25% attracted / 25% repelled,
             recolor accordingly
-    [ ] 9.  MouseForceSystem: push velocity toward / away from the cursor
+    [x] 9.  MouseForceSystem: push velocity toward / away from the cursor
     [x] 10. RollProperties(): 35% chance -> add Lifetime (2-5 seconds)
     [x] 11. LifetimeSystem: count down, tag with Destroy when it hits 0
-    [ ] 12. RollProperties(): 10% chance -> add Splitter (2-5 children)
+    [x] 12. RollProperties(): 10% chance -> add Splitter (2-5 children)
     [x] 13. DestructionSystem: for every Destroy-tagged entity, spawn its
             Splitter children at its position, THEN destroy it
-    [ ] 14. ClickSystem: left-click on an asteroid -> tag it with Destroy   (3pts w/ spawning)
+    [x] 14. ClickSystem: left-click on an asteroid -> tag it with Destroy   (3pts w/ spawning)
     [x] 15. No asteroid cap (the registry grows as needed)
 */
 
 #include <raylib.h>
-#include <raymath.h>
+#include "raymath.h"
 #include "entt.hpp"
 #include <vector>
 
@@ -34,8 +34,8 @@ const int   WINDOW_WIDTH  = 1280;
 const int   WINDOW_HEIGHT = 720;
 const int   TARGET_FPS    = 60;
 
-const float SPAWN_INTERVAL = 1.5f;     // seconds between spawns (your choice)
-const float SPAWN_REGION_W = 300.0f;   // size of the center spawn region
+const float SPAWN_INTERVAL = 1.5f;     // seconds between spawns
+const float SPAWN_REGION_W = 300.0f;   // size of center spawn region
 const float SPAWN_REGION_H = 200.0f;
 
 const int   MIN_RADIUS = 20;
@@ -44,11 +44,11 @@ const int   MIN_SPEED  = 80;
 const int   MAX_SPEED  = 250;
 
 const float MOUSE_FORCE   = 400.0f;    // acceleration toward/away from cursor (px/s^2)
-const float MAX_VELOCITY  = 500.0f;    // keeps attracted asteroids from going insane
+const float MAX_VELOCITY  = 500.0f;    // keeps attractwed asteroids from going insane
 
 const Color COLOR_NORMAL    = LIGHTGRAY;
 const Color COLOR_ATTRACTED = SKYBLUE;
-const Color COLOR_REPELLED  = ORANGE;
+const Color COLOR_REPELLED  = GREEN;
 
 
 struct Position    { Vector2 value; };
@@ -82,16 +82,14 @@ static void RollProperties(entt::registry& registry, entt::entity e) {
         float dir = RollChance(50) ? 1.0f : -1.0f;
         registry.emplace<MouseForce>(e, dir);
         registry.get<CircleShape>(e).color = (dir > 0) ? COLOR_ATTRACTED : COLOR_REPELLED;
-        
-        if (RollChance(35)) {
-            registry.emplace<Lifetime>(e, RandomFloat(2.0f, 5.0f));
-        }
-        
-        if (RollChance(10)) {
-            registry.emplace<Splitter>(e, GetRandomValue(2, 5));
-        }
-        
-        (void)registry; (void)e; // remove once implemented
+    }
+
+    if (RollChance(35)) {
+        registry.emplace<Lifetime>(e, RandomFloat(2.0f, 5.0f));
+    }
+
+    if (RollChance(10)) {
+        registry.emplace<Splitter>(e, GetRandomValue(2, 5));
     }
 }
 
@@ -132,13 +130,14 @@ static void MouseForceSystem(entt::registry& registry, float dt) {
     auto view = registry.view<Position, Velocity, MouseForce>();
 
     for (auto [e, pos, vel, force] : view.each()) {
-        // Hint:
-        //   Vector2 toMouse = Vector2Subtract(mouse, pos.value);
-        //   if (Vector2Length(toMouse) < 1.0f) continue;          // avoid normalizing zero
-        //   Vector2 dir = Vector2Normalize(toMouse);
-        //   vel.value = Vector2Add(vel.value, Vector2Scale(dir, force.direction * MOUSE_FORCE * dt));
-        //   vel.value = Vector2ClampValue(vel.value, 0.0f, MAX_VELOCITY);
-        (void)e; (void)pos; (void)vel; (void)force; (void)mouse; (void)dt; // remove once implemented
+        (void)e;
+        Vector2 toMouse = Vector2Subtract(mouse, pos.value);
+
+        if (Vector2Length(toMouse) < 1.0f) continue;
+
+        Vector2 dir = Vector2Normalize(toMouse);
+        vel.value = Vector2Add(vel.value, Vector2Scale(dir, force.direction * MOUSE_FORCE * dt));
+        vel.value = Vector2ClampValue(vel.value, 0.0f, MAX_VELOCITY);
     }
 }
 
@@ -149,8 +148,8 @@ static void MovementSystem(entt::registry& registry, float dt) {
     }
 }
 
-// Negates velocity on the window edges. Position is clamped so asteroids
-// can't get stuck flipping back and forth outside the window.
+// Negates velocity on the window edges. Position is 
+// fixed to avoid asteroids getting stuck outside window area.
 static void BounceSystem(entt::registry& registry) {
     auto view = registry.view<Position, Velocity, CircleShape>();
     for (auto [e, pos, vel, shape] : view.each()) {
@@ -173,9 +172,29 @@ static void LifetimeSystem(entt::registry& registry, float dt) {
 }
 
 // TODO 14: On left click, tag the asteroid under the cursor with Destroy.
-static void ClickSystem(entt::registry& registry) {}
+static void ClickSystem(entt::registry& registry) {
+    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
 
-// Destroys every entity tagged with Destroy. Handles Splitter children.
+    Vector2 mouse = GetMousePosition();
+    entt::entity hit = entt::null;
+    float bestDist = 0.0f;
+
+    auto view = registry.view<Position, CircleShape>();
+    for (auto [e, pos, shape] : view.each()) {
+        float d = Vector2Distance(mouse, pos.value);
+
+        if (d <= shape.radius && (hit == entt::null || d < bestDist)) {
+            hit = e;
+            bestDist = d;
+        }
+    }
+
+    if (hit != entt::null) {
+        registry.emplace_or_replace<Destroy>(hit);
+    }
+}
+
+// Destroys tagged stuff tagged w Destroy
 static void DestructionSystem(entt::registry& registry) {
         auto view = registry.view<Destroy>();
         std::vector<entt::entity> toDestroy(view.begin(), view.end());
