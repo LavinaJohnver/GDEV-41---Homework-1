@@ -2,7 +2,7 @@
     GDEV 41 - Homework 05: Entity-Component-System (EnTT) Asteroids
 
     TODO LIST
-    [x] 1.  Raylib window 1280x720, 60 FPS target                         
+    [x] 1.  Raylib window 1280x720, 60 FPS target
     [x] 2.  entt::registry created; components defined as plain structs
     [x] 3.  SpawnSystem: spawn an asteroid every SPAWN_INTERVAL seconds
             somewhere inside the center spawn region
@@ -10,13 +10,13 @@
     [x] 5.  MovementSystem: position += velocity * dt
     [x] 6.  BounceSystem: negate velocity on window edges
     [x] 7.  RenderSystem: draw every entity with Position + CircleShape
-    [ ] 8.  RollProperties(): 50% normal / 25% attracted / 25% repelled,
-            recolor accordingly                                             
+    [x] 8.  RollProperties(): 50% normal / 25% attracted / 25% repelled,
+            recolor accordingly
     [ ] 9.  MouseForceSystem: push velocity toward / away from the cursor
-    [ ] 10. RollProperties(): 35% chance -> add Lifetime (2-5 seconds)      
-    [ ] 11. LifetimeSystem: count down, tag with Destroy when it hits 0
-    [ ] 12. RollProperties(): 10% chance -> add Splitter (2-5 children)     
-    [ ] 13. DestructionSystem: for every Destroy-tagged entity, spawn its
+    [x] 10. RollProperties(): 35% chance -> add Lifetime (2-5 seconds)
+    [x] 11. LifetimeSystem: count down, tag with Destroy when it hits 0
+    [ ] 12. RollProperties(): 10% chance -> add Splitter (2-5 children)
+    [x] 13. DestructionSystem: for every Destroy-tagged entity, spawn its
             Splitter children at its position, THEN destroy it
     [ ] 14. ClickSystem: left-click on an asteroid -> tag it with Destroy   (3pts w/ spawning)
     [x] 15. No asteroid cap (the registry grows as needed)
@@ -24,7 +24,7 @@
 
 #include <raylib.h>
 #include <raymath.h>
-#include "entt.hpp"   // single-header EnTT (entt/single_include/entt/entt.hpp)
+#include "entt.hpp"
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ const int   WINDOW_WIDTH  = 1280;
 const int   WINDOW_HEIGHT = 720;
 const int   TARGET_FPS    = 60;
 
-const float SPAWN_INTERVAL = 0.5f;     // seconds between spawns (your choice)
+const float SPAWN_INTERVAL = 1.5f;     // seconds between spawns (your choice)
 const float SPAWN_REGION_W = 300.0f;   // size of the center spawn region
 const float SPAWN_REGION_H = 200.0f;
 
@@ -78,20 +78,21 @@ static bool RollChance(int percent) {
 
 // Decides the optional properties (part 3 of the specs) for a fresh asteroid.
 static void RollProperties(entt::registry& registry, entt::entity e) {
-    // TODO 8: Attract / repel (50% normal, 50% special -> 50/50 attract vs repel)
-    //   if (RollChance(50)) {
-    //       float dir = RollChance(50) ? 1.0f : -1.0f;
-    //       registry.emplace<MouseForce>(e, dir);
-    //       registry.get<CircleShape>(e).color = (dir > 0) ? COLOR_ATTRACTED : COLOR_REPELLED;
-    //   }
-
-    // TODO 10: 35% chance -> registry.emplace<Lifetime>(e, RandomFloat(2.0f, 5.0f));
-    //   (Optional) give it a visual hint, e.g. draw a ring or show the timer in RenderSystem.
-
-    // TODO 12: 10% chance -> registry.emplace<Splitter>(e, GetRandomValue(2, 5));
-    //   (Optional) visual hint here too, e.g. a thicker outline.
-
-    (void)registry; (void)e; // remove once implemented
+    if (RollChance(50)) {
+        float dir = RollChance(50) ? 1.0f : -1.0f;
+        registry.emplace<MouseForce>(e, dir);
+        registry.get<CircleShape>(e).color = (dir > 0) ? COLOR_ATTRACTED : COLOR_REPELLED;
+        
+        if (RollChance(35)) {
+            registry.emplace<Lifetime>(e, RandomFloat(2.0f, 5.0f));
+        }
+        
+        if (RollChance(10)) {
+            registry.emplace<Splitter>(e, GetRandomValue(2, 5));
+        }
+        
+        (void)registry; (void)e; // remove once implemented
+    }
 }
 
 // Creates one asteroid entity at `pos`. Used by the spawner AND by splitters.
@@ -161,15 +162,35 @@ static void BounceSystem(entt::registry& registry) {
     }
 }
 
-// TODO 11: Count down Lifetime; when it reaches 0, tag the entity with Destroy.
-static void LifetimeSystem(entt::registry& registry, float dt) {}
-
+static void LifetimeSystem(entt::registry& registry, float dt) {
+    auto view = registry.view<Lifetime>();
+    for (auto [e, life] : view.each()) {
+        life.timeLeft -= dt;
+        if (life.timeLeft <= 0.0f) {
+            registry.emplace_or_replace<Destroy>(e);
+        }
+    }
+}
 
 // TODO 14: On left click, tag the asteroid under the cursor with Destroy.
 static void ClickSystem(entt::registry& registry) {}
 
 // Destroys every entity tagged with Destroy. Handles Splitter children.
-static void DestructionSystem(entt::registry& registry) {}
+static void DestructionSystem(entt::registry& registry) {
+        auto view = registry.view<Destroy>();
+        std::vector<entt::entity> toDestroy(view.begin(), view.end());
+        
+        for (auto e : toDestroy) {
+            if (auto* splitter = registry.try_get<Splitter>(e)) {
+                if (auto* pos = registry.try_get<Position>(e)) {
+                    for (int i = 0; i < splitter->count; ++i) {
+                        SpawnAsteroid(registry, pos->value);
+                    }
+                }
+            }
+            registry.destroy(e);
+        }
+    }
 
 static void RenderSystem(entt::registry& registry) {
     auto view = registry.view<Position, CircleShape>();
